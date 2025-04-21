@@ -1,0 +1,210 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.File;
+import java.util.Random;
+import javax.sound.sampled.*;
+
+class SparkPanel extends JPanel {
+    private final int sparkCount = 40;
+    private final Point[] sparkPoints = new Point[sparkCount];
+    private final Random rand = new Random();
+
+    public SparkPanel() {
+        setOpaque(true);
+        for (int i = 0; i < sparkCount; i++) {
+            sparkPoints[i] = new Point(rand.nextInt(500), rand.nextInt(600));
+        }
+
+        Timer timer = new Timer(150, e -> {
+            for (int i = 0; i < sparkCount; i++) {
+                sparkPoints[i].x = rand.nextInt(getWidth());
+                sparkPoints[i].y = rand.nextInt(getHeight());
+            }
+            repaint();
+        });
+        timer.start();
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+
+        Graphics2D g2d = (Graphics2D) g;
+        Color topColor = new Color(24, 40, 72);
+        Color bottomColor = new Color(64, 224, 208);
+        GradientPaint gp = new GradientPaint(0, 0, topColor, 0, getHeight(), bottomColor);
+        g2d.setPaint(gp);
+        g2d.fillRect(0, 0, getWidth(), getHeight());
+
+        g.setColor(new Color(255, 255, 255, 100));
+        for (Point p : sparkPoints) {
+            g.fillOval(p.x, p.y, 5, 5);
+        }
+    }
+}
+
+public class Main extends JFrame implements ActionListener {
+    private JButton[][] buttons = new JButton[4][4];
+    private char[][] board = new char[4][4];
+    private JLabel statusLabel, scoreLabel;
+    private final String playerName = "Spark Trinity";
+    private int playerScore = 0, aiScore = 0;
+    private Random random = new Random();
+
+    public Main() {
+        setTitle("Tic-Tac-Toe: " + playerName + " vs AI");
+        setSize(480, 540);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        SparkPanel sparkPanel = new SparkPanel();
+        sparkPanel.setLayout(new BorderLayout());
+        setContentPane(sparkPanel);
+
+        JPanel topPanel = new JPanel(new GridLayout(2, 1));
+        topPanel.setOpaque(false);
+
+        statusLabel = new JLabel(playerName + "'s Turn (O)", JLabel.CENTER);
+        statusLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        statusLabel.setForeground(Color.WHITE);
+
+        scoreLabel = new JLabel(getScoreText(), JLabel.CENTER);
+        scoreLabel.setFont(new Font("Arial", Font.BOLD, 16));
+        scoreLabel.setForeground(Color.YELLOW);
+
+        topPanel.add(statusLabel);
+        topPanel.add(scoreLabel);
+
+        JPanel gamePanel = new JPanel(new GridLayout(4, 4));
+        gamePanel.setOpaque(false);
+
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                buttons[i][j] = new JButton();
+                buttons[i][j].setFont(new Font("Comic Sans MS", Font.BOLD, 40));
+                buttons[i][j].setFocusPainted(false);
+                buttons[i][j].setBackground(new Color(255, 255, 255, 200));
+                buttons[i][j].setForeground(Color.BLACK);
+                buttons[i][j].addActionListener(this);
+                gamePanel.add(buttons[i][j]);
+                board[i][j] = ' ';
+            }
+        }
+
+        sparkPanel.add(topPanel, BorderLayout.NORTH);
+        sparkPanel.add(gamePanel, BorderLayout.CENTER);
+        setVisible(true);
+
+        aiMove();
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                if (e.getSource() == buttons[i][j] && board[i][j] == ' ') {
+                    makeMove(i, j, 'O');
+                    if (checkWin('O')) {
+                        playerScore++;
+                        showGameOver(playerName + " Wins!", "win.wav");
+                        return;
+                    }
+                    if (isBoardFull()) {
+                        showGameOver("It's a Draw!", "draw.wav");
+                        return;
+                    }
+                    aiMove();
+                    if (checkWin('X')) {
+                        aiScore++;
+                        showGameOver("AI Wins!", "lose.wav");
+                        return;
+                    }
+                    if (isBoardFull()) {
+                        showGameOver("It's a Draw!", "draw.wav");
+                    }
+                }
+            }
+        }
+    }
+
+    private void makeMove(int row, int col, char player) {
+        board[row][col] = player;
+        buttons[row][col].setText(String.valueOf(player));
+        buttons[row][col].setEnabled(false);
+        buttons[row][col].setForeground(player == 'X' ? Color.RED : Color.BLUE);
+        statusLabel.setText(player == 'O' ? "AI's Turn (X)" : playerName + "'s Turn (O)");
+    }
+
+    private void aiMove() {
+        int row, col;
+        do {
+            row = random.nextInt(4);
+            col = random.nextInt(4);
+        } while (board[row][col] != ' ');
+        makeMove(row, col, 'X');
+    }
+
+    private boolean checkWin(char player) {
+        for (int i = 0; i < 4; i++) {
+            if (board[i][0] == player && board[i][1] == player &&
+                    board[i][2] == player && board[i][3] == player) return true;
+            if (board[0][i] == player && board[1][i] == player &&
+                    board[2][i] == player && board[3][i] == player) return true;
+        }
+        if (board[0][0] == player && board[1][1] == player &&
+                board[2][2] == player && board[3][3] == player) return true;
+        if (board[0][3] == player && board[1][2] == player &&
+                board[2][1] == player && board[3][0] == player) return true;
+        return false;
+    }
+
+    private boolean isBoardFull() {
+        for (int i = 0; i < 4; i++)
+            for (int j = 0; j < 4; j++)
+                if (board[i][j] == ' ') return false;
+        return true;
+    }
+
+    private void showGameOver(String message, String soundFile) {
+        playSound(soundFile);
+        statusLabel.setText(message);
+        scoreLabel.setText(getScoreText());
+
+        Timer delay = new Timer(2000, e -> resetGame());
+        delay.setRepeats(false);
+        delay.start();
+    }
+
+    private void resetGame() {
+        statusLabel.setText(playerName + "'s Turn (O)");
+        for (int i = 0; i < 4; i++)
+            for (int j = 0; j < 4; j++) {
+                board[i][j] = ' ';
+                buttons[i][j].setText("");
+                buttons[i][j].setEnabled(true);
+                buttons[i][j].setBackground(new Color(255, 255, 255, 200));
+                buttons[i][j].setForeground(Color.BLACK);
+            }
+        aiMove();
+    }
+
+    private String getScoreText() {
+        return playerName + ": " + playerScore + "   |   AI: " + aiScore;
+    }
+
+    private void playSound(String filename) {
+        try {
+            AudioInputStream audio = AudioSystem.getAudioInputStream(new File(filename).getAbsoluteFile());
+            Clip clip = AudioSystem.getClip();
+            clip.open(audio);
+            clip.start();
+        } catch (Exception ex) {
+            System.out.println("Sound error: " + ex.getMessage());
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(Main::new);
+    }
+}
